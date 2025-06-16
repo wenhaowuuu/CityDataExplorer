@@ -28,7 +28,12 @@ app.get('/api/city-income/:cityName', async(req, res) => {
                 name.startsWith(cityName.toLowerCase() + ',');
         });
         if (!cityEntry) {
-            const examples = placeData.slice(1, 6).map(e => e[0] ? .split(',')[0]).join(', ');
+            const examples = placeData.slice(1, 6).map(e => e[0] ? e[0].split(',')[0] : '').filter(name => name).join(', ');
+
+            // const exampleCities = placeData.slice(1, 6).map(entry =>
+            //                     entry[0] ? entry[0].split(',')[0] : ''
+            //                 ).filter(name => name).join(', ');
+
             return res.status(404).json({
                 error: `City "${cityName}" not found`,
                 suggestion: `Try one of: ${examples}`
