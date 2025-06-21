@@ -344,25 +344,7 @@
             resultsContent.innerHTML = `<div class="spinner"></div>${message}`;
         }
 
-        // function showResults(data) {
-        //     results.style.display = 'block';
-        //     results.className = 'results';
-
-        //     resultsContent.innerHTML = `
-        //         <h3>📊 ${data.cityName}</h3>
-        //         <div class="income-value">${data.formattedIncome}</div>
-        //         <p><strong>Median Household Income</strong></p>
-        //         <div class="details">
-        //             <p><strong>Data Source:</strong> ${data.source}</p>
-        //             <p><strong>FIPS Code:</strong> ${data.fipsCode}</p>
-        //             <p><strong>Raw Value:</strong> $${data.medianIncome.toLocaleString()}</p>
-        //         </div>
-        //         <p style="margin-top: 15px; color: #666; font-size: 0.9em;">
-        //             <em>Source: U.S. Census Bureau American Community Survey</em>
-        //         </p>
-        //     `;
-        // }
-
+        //Version 0 - only income
         function showResults(data) {
             results.style.display = 'block';
             results.className = 'results';
@@ -372,17 +354,36 @@
                 <div class="income-value">${data.formattedIncome}</div>
                 <p><strong>Median Household Income</strong></p>
                 <div class="details">
-                    <p><strong>Total Population:</strong> ${data.formattedPopulation}</p>
-                    <p><strong>Adults without High School:</strong> ${data.formattedAdultsNoHighSchool}</p>
                     <p><strong>Data Source:</strong> ${data.source}</p>
                     <p><strong>FIPS Code:</strong> ${data.fipsCode}</p>
-                    <p><strong>Raw Income:</strong> $${data.medianIncome.toLocaleString()}</p>
+                    <p><strong>Raw Value:</strong> $${data.medianIncome.toLocaleString()}</p>
                 </div>
-                <p style="margin-top:15px; color:#666; font-size:0.9em;">
-                    <em>Powered by U.S. Census Bureau ACS Profile</em>
+                <p style="margin-top: 15px; color: #666; font-size: 0.9em;">
+                    <em>Source: U.S. Census Bureau American Community Survey</em>
                 </p>
-                `;
+            `;
         }
+
+        // //BUG - Version 1
+        // function showResults(data) {
+        //     results.style.display = 'block';
+        //     results.className = 'results';
+
+        //     resultsContent.innerHTML = `
+        //         <h3>📊 ${data.cityName}</h3>
+        //         <div class="income-value">${data.formattedIncome}</div>
+        //         <p><strong>Median Household Income</strong></p>
+        //         <div class="details">
+        //             <p><strong>Total Population:</strong> ${data.formattedPopulation}</p>
+        //             <p><strong>Adults without High School:</strong> ${data.formattedAdultsNoHighSchool}</p>
+        //             <p><strong>Data Source:</strong> ${data.source}</p>
+        //             <p><strong>FIPS Code:</strong> ${data.fipsCode}</p>
+        //             <p><strong>Raw Income:</strong> $${data.medianIncome.toLocaleString()}</p>
+        //         </div>
+        //         <p style="margin-top:15px; color:#666; font-size:0.9em;">
+        //             <em>Powered by U.S. Census Bureau ACS Profile</em>
+        //         </p>`;
+        // }
 
 
 
