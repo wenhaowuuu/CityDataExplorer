@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>California City Median Income Lookup</title>
+    <title>US Census Tract Data Explorer</title>
     <style>
         * {
             margin: 0;
@@ -56,23 +56,34 @@
             background-clip: text;
         }
         
-        .search-container {
-            position: relative;
+        .input-container {
             margin-bottom: 30px;
         }
-        
-        .search-input {
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .input-field {
             width: 100%;
             padding: 15px 20px;
             font-size: 18px;
             border: 2px solid #e0e0e0;
-            border-radius: 50px;
+            border-radius: 15px;
             outline: none;
             transition: all 0.3s ease;
             background: white;
         }
-        
-        .search-input:focus {
+
+        .input-field:focus {
             border-color: #667eea;
             box-shadow: 0 0 20px rgba(102, 126, 234, 0.2);
             transform: translateY(-2px);
@@ -132,11 +143,36 @@
             font-size: 1.4em;
         }
         
-        .income-value {
-            font-size: 2.2em;
+        .data-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .data-item {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 15px;
+            border-left: 4px solid #667eea;
+            text-align: center;
+        }
+
+        .data-label {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .data-value {
+            font-size: 1.8em;
             font-weight: bold;
+            color: #333;
+        }
+
+        .income-value {
             color: #667eea;
-            margin: 10px 0;
         }
         
         .error {
@@ -228,15 +264,25 @@
 
 <body>
     <div class="container">
-        <h1>🏡 California Income Lookup</h1>
-        <p class="subtitle">Find median household income for any California city</p>
+        <h1>📊 US Census Tract Data Explorer</h1>
+        <p class="subtitle">Get demographic data for any census tract in the United States</p>
 
-        <div class="search-container">
-            <input type="text" id="cityInput" class="search-input" placeholder="Enter California city name (e.g., Los Angeles, San Francisco)" autocomplete="off">
-            <div id="suggestions" class="suggestions"></div>
+        <div class="input-container">
+            <div class="input-group">
+                <label for="stateInput">State FIPS Code</label>
+                <input type="text" id="stateInput" class="input-field" placeholder="06 (California)" maxlength="2">
+            </div>
+            <div class="input-group">
+                <label for="countyInput">County FIPS Code</label>
+                <input type="text" id="countyInput" class="input-field" placeholder="075 (San Francisco)" maxlength="3">
+            </div>
+            <div class="input-group">
+                <label for="tractInput">Census Tract Code</label>
+                <input type="text" id="tractInput" class="input-field" placeholder="018700" maxlength="6">
+            </div>
         </div>
 
-        <button id="searchBtn" class="search-btn">Search Income Data</button>
+        <button id="searchBtn" class="search-btn">Get Tract Data</button>
 
         <div id="results" class="results">
             <div id="resultsContent"></div>
@@ -248,86 +294,73 @@
     </div>
 
     <script>
-        // Common California cities for suggestions
-        const californiaCities = [
-            'Los Angeles', 'San Diego', 'San Jose', 'San Francisco', 'Fresno',
-            'Sacramento', 'Long Beach', 'Oakland', 'Bakersfield', 'Anaheim',
-            'Santa Ana', 'Riverside', 'Stockton', 'Irvine', 'Fremont',
-            'San Bernardino', 'Modesto', 'Fontana', 'Oxnard', 'Moreno Valley',
-            'Huntington Beach', 'Glendale', 'Santa Clarita', 'Garden Grove', 'Oceanside',
-            'Rancho Cucamonga', 'Santa Rosa', 'Ontario', 'Lancaster', 'Elk Grove',
-            'Corona', 'Palmdale', 'Salinas', 'Pomona', 'Hayward',
-            'Escondido', 'Torrance', 'Sunnyvale', 'Orange', 'Fullerton',
-            'Pasadena', 'Thousand Oaks', 'Visalia', 'Simi Valley', 'Concord',
-            'Alameda', 'Berkeley', 'Richmond', 'Santa Barbara', 'Vallejo'
-        ];
+        // Example census tract codes for common areas
+        const exampleTracts = {
+            'CA San Francisco': { state: '06', county: '075', tract: '018700' },
+            'CA Los Angeles': { state: '06', county: '037', tract: '201000' },
+            'NY Manhattan': { state: '36', county: '061', tract: '010600' },
+            'TX Harris County': { state: '48', county: '201', tract: '100100' },
+            'FL Miami-Dade': { state: '12', county: '086', tract: '001800' }
+        };
 
-        const cityInput = document.getElementById('cityInput');
+        const stateInput = document.getElementById('stateInput');
+        const countyInput = document.getElementById('countyInput');
+        const tractInput = document.getElementById('tractInput');
         const searchBtn = document.getElementById('searchBtn');
         const results = document.getElementById('results');
         const resultsContent = document.getElementById('resultsContent');
-        const suggestions = document.getElementById('suggestions');
 
-        // Auto-suggestions
-        cityInput.addEventListener('input', function() {
-            const value = this.value.toLowerCase();
-            if (value.length < 2) {
-                suggestions.style.display = 'none';
+        // Add input validation and formatting
+        stateInput.addEventListener('input', function() {
+            this.value = this.value.replace(/\D/g, '').substring(0, 2);
+        });
+
+        countyInput.addEventListener('input', function() {
+            this.value = this.value.replace(/\D/g, '').substring(0, 3);
+        });
+
+        tractInput.addEventListener('input', function() {
+            this.value = this.value.replace(/\D/g, '').substring(0, 6);
+        });
+
+        searchBtn.addEventListener('click', searchTractData);
+
+        // Add enter key support for all inputs
+        [stateInput, countyInput, tractInput].forEach(input => {
+            input.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchTractData();
+                }
+            });
+        });
+
+        async function searchTractData() {
+            const state = stateInput.value.trim();
+            const county = countyInput.value.trim();
+            const tract = tractInput.value.trim();
+
+            if (!state || !county || !tract) {
+                showError('Please fill in all fields: State, County, and Census Tract codes');
                 return;
             }
 
-            const matches = californiaCities.filter(city =>
-                city.toLowerCase().includes(value)
-            ).slice(0, 8);
-
-            if (matches.length > 0) {
-                suggestions.innerHTML = matches.map(city =>
-                    `<div class="suggestion-item" onclick="selectCity('${city}')">${city}</div>`
-                ).join('');
-                suggestions.style.display = 'block';
-            } else {
-                suggestions.style.display = 'none';
-            }
-        });
-
-        function selectCity(city) {
-            cityInput.value = city;
-            suggestions.style.display = 'none';
-        }
-
-        // Hide suggestions when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.search-container')) {
-                suggestions.style.display = 'none';
-            }
-        });
-
-        searchBtn.addEventListener('click', searchIncome);
-        cityInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                searchIncome();
-            }
-        });
-
-        async function searchIncome() {
-            const cityName = cityInput.value.trim();
-            if (!cityName) {
-                showError('Please enter a city name');
+            if (state.length < 1 || county.length < 1 || tract.length < 1) {
+                showError('Please enter valid FIPS codes (State: 1-2 digits, County: 1-3 digits, Tract: 1-6 digits)');
                 return;
             }
 
             searchBtn.disabled = true;
-            showLoading('Searching for income data...');
+            showLoading('Fetching census tract data...');
 
             try {
                 // Call our backend API
-                const response = await fetch(`/api/city-income/${encodeURIComponent(cityName)}`);
+                const response = await fetch(`/api/tract-data/${encodeURIComponent(state)}/${encodeURIComponent(county)}/${encodeURIComponent(tract)}`);
                 const data = await response.json();
 
                 if (response.ok && data.success) {
                     showResults(data);
                 } else {
-                    showError(data.error || 'Failed to fetch income data', data.suggestion);
+                    showError(data.error || 'Failed to fetch tract data', data.suggestion || data.example);
                 }
 
             } catch (error) {
@@ -344,19 +377,41 @@
             resultsContent.innerHTML = `<div class="spinner"></div>${message}`;
         }
 
-        //Version 0 - only income
         function showResults(data) {
             results.style.display = 'block';
             results.className = 'results';
 
+            const tractInfo = `${data.location.state}-${data.location.county}-${data.location.tract}`;
+
             resultsContent.innerHTML = `
-                <h3>📊 ${data.cityName}</h3>
-                <div class="income-value">${data.formattedIncome}</div>
-                <p><strong>Median Household Income</strong></p>
+                <h3>📊 ${data.tractName}</h3>
+                <p style="margin-bottom: 20px; color: #666;"><strong>Tract ID:</strong> ${tractInfo}</p>
+
+                <div class="data-grid">
+                    <div class="data-item">
+                        <div class="data-label">Median Household Income</div>
+                        <div class="data-value income-value">${data.data.medianHouseholdIncome.formatted}</div>
+                    </div>
+
+                    <div class="data-item">
+                        <div class="data-label">Total Population</div>
+                        <div class="data-value">${data.data.totalPopulation.formatted}</div>
+                    </div>
+
+                    <div class="data-item">
+                        <div class="data-label">Without High School Diploma</div>
+                        <div class="data-value">${data.data.percentWithoutHighSchool.formatted}</div>
+                    </div>
+
+                    <div class="data-item">
+                        <div class="data-label">Below Poverty Level</div>
+                        <div class="data-value">${data.data.percentInPoverty.formatted}</div>
+                    </div>
+                </div>
+
                 <div class="details">
                     <p><strong>Data Source:</strong> ${data.source}</p>
-                    <p><strong>FIPS Code:</strong> ${data.fipsCode}</p>
-                    <p><strong>Raw Value:</strong> $${data.medianIncome.toLocaleString()}</p>
+                    <p><strong>Note:</strong> ${data.note}</p>
                 </div>
                 <p style="margin-top: 15px; color: #666; font-size: 0.9em;">
                     <em>Source: U.S. Census Bureau American Community Survey</em>

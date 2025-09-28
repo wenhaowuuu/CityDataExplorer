@@ -119,96 +119,127 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public')); // Serve static files from public directory
 
-// API endpoint to search for California city income data
-app.get('/api/city-income/:cityName', async(req, res) => {
+// API endpoint to get census tract demographic data
+app.get('/api/tract-data/:state/:county/:tract', async(req, res) => {
     try {
-        const cityName = req.params.cityName.trim();
+        const { state, county, tract } = req.params;
 
-        if (!cityName) {
-            return res.status(400).json({ error: 'City name is required' });
-        }
-
-        console.log(`Searching for city: ${cityName}`);
-
-        // Step 1: Get all California places to find the FIPS code
-        const placeUrl = 'https://api.census.gov/data/2023/acs/acs5?get=NAME&for=place:*&in=state:06';
-        const placeResponse = await fetch(placeUrl);
-
-        if (!placeResponse.ok) {
-            throw new Error(`Place API HTTP error! status: ${placeResponse.status}`);
-        }
-
-        const placeData = await placeResponse.json();
-        console.log('Sample place data:', placeData.slice(0, 3));
-
-        // Step 2: Find the city in the place data
-        const cityEntry = placeData.find(entry => {
-            if (!entry[0]) return false;
-            const entryName = entry[0].toLowerCase();
-            const searchName = cityName.toLowerCase();
-
-            // Try different matching patterns
-            return entryName.includes(searchName + ' city') ||
-                entryName.includes(searchName + ' town') ||
-                entryName.startsWith(searchName + ',') ||
-                entryName === searchName + ', california';
-        });
-
-        if (!cityEntry) {
-            // Get some example cities for the error message
-            const exampleCities = placeData.slice(1, 6).map(entry =>
-                entry[0] ? entry[0].split(',')[0] : ''
-            ).filter(name => name).join(', ');
-
-            return res.status(404).json({
-                error: `City "${cityName}" not found in California`,
-                suggestion: `Try cities like: ${exampleCities}`
+        // Validate inputs
+        if (!state || !county || !tract) {
+            return res.status(400).json({
+                error: 'State, county, and tract codes are required',
+                example: 'Use format: /api/tract-data/06/075/018700 for state 06, county 075, tract 018700'
             });
         }
 
-        // Step 3: Extract FIPS code (should be at index 3 based on user feedback)
-        const placeFips = cityEntry.length > 3 ? cityEntry[3] : cityEntry[2];
-        console.log('Found city entry:', cityEntry);
-        console.log('Using FIPS code:', placeFips);
+        // Ensure proper formatting (pad with zeros if needed)
+        const stateFips = state.padStart(2, '0');
+        const countyFips = county.padStart(3, '0');
+        const tractFips = tract.padStart(6, '0');
 
-        // Step 4: Get median household income data
-        const incomeUrl = `https://api.census.gov/data/2023/acs/acs5/subject?get=NAME,S1901_C01_012E&for=place:${placeFips}&in=state:06`;
-        console.log('Income API URL:', incomeUrl);
+        console.log(`Fetching data for tract: ${tractFips}, county: ${countyFips}, state: ${stateFips}`);
 
-        const incomeResponse = await fetch(incomeUrl);
+        // Get comprehensive demographic data in one API call
+        // Variables:
+        // B19013_001E: Median household income
+        // B01001_001E: Total population
+        // S1501_C02_015E: Percent 25+ without high school diploma
+        // S1701_C03_001E: Percent below poverty level
+        const dataUrl = `https://api.census.gov/data/2023/acs/acs5?get=NAME,B19013_001E,B01001_001E&for=tract:${tractFips}&in=state:${stateFips}&in=county:${countyFips}`;
 
-        if (!incomeResponse.ok) {
-            throw new Error(`Income API HTTP error! status: ${incomeResponse.status}`);
+        console.log('Primary data API URL:', dataUrl);
+
+        const dataResponse = await fetch(dataUrl);
+
+        if (!dataResponse.ok) {
+            throw new Error(`Census API HTTP error! status: ${dataResponse.status}`);
         }
 
-        const incomeData = await incomeResponse.json();
-        console.log('Income data response:', incomeData);
+        const basicData = await dataResponse.json();
+        console.log('Basic data response:', basicData);
 
-        if (incomeData && incomeData.length > 1) {
-            const medianIncome = incomeData[1][1];
-            const fullCityName = incomeData[1][0];
+        if (!basicData || basicData.length < 2) {
+            return res.status(404).json({
+                error: `Census tract ${tractFips} not found in county ${countyFips}, state ${stateFips}`,
+                suggestion: 'Verify the state, county, and tract codes are correct'
+            });
+        }
 
-            if (medianIncome && medianIncome !== 'null' && medianIncome !== null && medianIncome !== '-') {
-                // Return successful response
-                res.json({
-                    success: true,
-                    cityName: fullCityName,
-                    medianIncome: parseInt(medianIncome),
-                    formattedIncome: new Intl.NumberFormat('en-US', {
-                        style: 'currency',
-                        currency: 'USD',
-                        minimumFractionDigits: 0,
-                        maximumFractionDigits: 0
-                    }).format(parseInt(medianIncome)),
-                    source: '2023 ACS 5-Year Estimates',
-                    fipsCode: placeFips
-                });
-            } else {
-                res.status(404).json({ error: 'Income data not available for this city' });
+        // Get education and poverty data from subject tables
+        const subjectDataUrl = `https://api.census.gov/data/2023/acs/acs5/subject?get=NAME,S1501_C02_015E,S1701_C03_001E&for=tract:${tractFips}&in=state:${stateFips}&in=county:${countyFips}`;
+
+        console.log('Subject data API URL:', subjectDataUrl);
+
+        const subjectResponse = await fetch(subjectDataUrl);
+        let educationPct = null;
+        let povertyPct = null;
+
+        if (subjectResponse.ok) {
+            const subjectData = await subjectResponse.json();
+            console.log('Subject data response:', subjectData);
+
+            if (subjectData && subjectData.length > 1) {
+                educationPct = subjectData[1][1]; // % without HS diploma
+                povertyPct = subjectData[1][2]; // % below poverty
             }
         } else {
-            res.status(500).json({ error: 'Invalid response format from Census API' });
+            console.warn('Subject data not available, will show basic data only');
         }
+
+        // Parse the basic data
+        const [tractName, medianIncomeRaw, totalPopRaw] = basicData[1];
+
+        // Convert to numbers and handle null values
+        const medianIncome = medianIncomeRaw && medianIncomeRaw !== 'null' && medianIncomeRaw !== '-'
+            ? parseInt(medianIncomeRaw) : null;
+        const totalPopulation = totalPopRaw && totalPopRaw !== 'null' && totalPopRaw !== '-'
+            ? parseInt(totalPopRaw) : null;
+        const pctNoHighSchool = educationPct && educationPct !== 'null' && educationPct !== '-'
+            ? parseFloat(educationPct) : null;
+        const pctInPoverty = povertyPct && povertyPct !== 'null' && povertyPct !== '-'
+            ? parseFloat(povertyPct) : null;
+
+        // Format for display
+        const nf = new Intl.NumberFormat('en-US');
+        const currencyFormatter = new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        });
+
+        // Build response
+        const response = {
+            success: true,
+            tractName: tractName,
+            location: {
+                state: stateFips,
+                county: countyFips,
+                tract: tractFips
+            },
+            data: {
+                medianHouseholdIncome: {
+                    value: medianIncome,
+                    formatted: medianIncome ? currencyFormatter.format(medianIncome) : 'Data not available'
+                },
+                totalPopulation: {
+                    value: totalPopulation,
+                    formatted: totalPopulation ? nf.format(totalPopulation) : 'Data not available'
+                },
+                percentWithoutHighSchool: {
+                    value: pctNoHighSchool,
+                    formatted: pctNoHighSchool ? `${pctNoHighSchool.toFixed(1)}%` : 'Data not available'
+                },
+                percentInPoverty: {
+                    value: pctInPoverty,
+                    formatted: pctInPoverty ? `${pctInPoverty.toFixed(1)}%` : 'Data not available'
+                }
+            },
+            source: '2023 ACS 5-Year Estimates',
+            note: 'Data represents estimates for the 2019-2023 period'
+        };
+
+        res.json(response);
 
     } catch (error) {
         console.error('API Error:', error);
